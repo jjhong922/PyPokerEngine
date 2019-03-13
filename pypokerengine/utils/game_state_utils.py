@@ -60,6 +60,7 @@ def deepcopy_game_state(game_state):
             }
 
 _street_flg_translator = {
+        "auction": Const.Street.AUCTION,
         "preflop": Const.Street.PREFLOP,
         "flop": Const.Street.FLOP,
         "turn": Const.Street.TURN,

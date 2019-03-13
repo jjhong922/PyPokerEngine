@@ -5,6 +5,8 @@ class MessageBuilder:
 
   GAME_START_MESSAGE = "game_start_message"
   ROUND_START_MESSAGE = "round_start_message"
+  BID_REQUEST_MESSAGE = "bid_request_message"
+  AUCTION_RESULT_MESSAGE = "auction_result_message"
   STREET_START_MESSAGE = "street_start_message"
   ASK_MESSAGE = "ask_message"
   GAME_UPDATE_MESSAGE = "game_update_message"
@@ -38,6 +40,32 @@ class MessageBuilder:
         "round_state": DataEncoder.encode_round_state(state)
         }
     message.update(DataEncoder.encode_street(state["street"]))
+    return self.__build_notification_message(message)
+
+  @classmethod
+  def build_bid_request_message(self, player_pos, state):
+    players = state["table"].seats.players
+    player = players[player_pos]
+    hole_card = DataEncoder.encode_player(player, holecard=True)["hole_card"]
+    message = {
+        "message_type" : self.BID_REQUEST_MESSAGE,
+        "hole_card": hole_card,
+        "round_state": DataEncoder.encode_round_state(state),
+    }
+    return self.__build_ask_message(message)
+
+  @classmethod
+  def build_auction_result_message(self, player_pos, winners_pos, river_card, state):
+    players = state["table"].seats.players
+    player = players[player_pos]
+    winners = [players[i] for i in winners_pos]
+    river_card = river_card if player_pos in winners_pos else None
+    message = {
+        "message_type": self.AUCTION_RESULT_MESSAGE,
+        "river_card": river_card,
+        "round_state": DataEncoder.encode_round_state(state)
+    }
+    message.update(DataEncoder.encode_winners(winners))
     return self.__build_notification_message(message)
 
   @classmethod

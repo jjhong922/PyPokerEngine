@@ -42,10 +42,12 @@ class Dealer:
 
   def play_round(self, round_count, blind_amount, ante, table):
     state, msgs = RoundManager.start_new_round(round_count, blind_amount, ante, table)
+    bid_resps = self.__publish_messages(msgs)
+    state, msgs = RoundManager.complete_auction(state, bid_resps)
     while True:
       self.__message_check(msgs, state["street"])
       if state["street"] != Const.Street.FINISHED:  # continue the round
-        action, bet_amount = self.__publish_messages(msgs)
+        action, bet_amount = self.__publish_messages(msgs)[-1]
         state, msgs = RoundManager.apply_action(state, action, bet_amount)
       else:  # finish the round after publish round result
         self.__publish_messages(msgs)
@@ -97,10 +99,14 @@ class Dealer:
       raise Exception("Last message is not ask type. : %s" % msgs)
 
   def __publish_messages(self, msgs):
-    for address, msg in msgs[:-1]:
-      self.message_handler.process_message(address, msg)
+    ask_resp = []
+    for address, msg in msgs:
+      resp = self.message_handler.process_message(address, msg)
+      if msg["type"] == 'ask':
+          ask_resp.append(resp)
     self.message_summarizer.summarize_messages(msgs)
-    return self.message_handler.process_message(*msgs[-1])
+    # return self.message_handler.process_message(*msgs[-1])
+    return ask_resp
 
   def __exclude_short_of_money_players(self, table, ante, sb_amount):
     sb_pos, bb_pos = self.__steal_money_from_poor_player(table, ante, sb_amount)
@@ -236,6 +242,8 @@ class MessageSummarizer(object):
             return self.summarize_round_result(content)
         if MessageBuilder.GAME_RESULT_MESSAGE == message_type:
             return self.summarize_game_result(content)
+        if MessageBuilder.AUCTION_RESULT_MESSAGE == message_type:
+            return self.summarize_auction_result(content)
 
     def summarize_game_start(self, message):
         base = "Started the game with player %s for %d round. (start stack=%s, small blind=%s)"
@@ -263,6 +271,12 @@ class MessageSummarizer(object):
         winners = [player["name"] for player in message["winners"]]
         stack = { player["name"]:player["stack"] for player in message["round_state"]["seats"] }
         return base % (winners, message["round_count"], stack)
+
+    def summarize_auction_result(self, message):
+        base = '"%s" won the auction (stack = %s)'
+        winners = [player["name"] for player in message["winners"]]
+        stack = { player["name"]:player["stack"] for player in message["round_state"]["seats"] }
+        return base % (winners, stack)
 
     def summarize_game_result(self, message):
         base = 'Game finished. (stack = %s)'

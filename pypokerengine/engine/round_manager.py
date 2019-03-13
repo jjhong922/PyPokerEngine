@@ -22,7 +22,29 @@ class RoundManager:
     self.__deal_holecard(table.deck, table.seats.players)
     start_msg = self.__round_start_message(round_count, table)
     state, street_msgs = self.__start_street(state)
-    return state, start_msg + street_msgs
+    bid_request_msgs = self.__run_auction(state)
+    return state, start_msg + street_msgs + bid_request_msgs
+
+  @classmethod
+  def __run_auction(self, state):
+    players = state["table"].seats.players
+    msgs = []
+    for player_pos in range(len(players)):
+      msgs.append((players[player_pos].uuid, MessageBuilder.build_bid_request_message(player_pos, self.__deep_copy_state(state))))
+    return msgs
+
+  @classmethod
+  def complete_auction(self, state, bid_resps):
+    state = self.__deep_copy_state(state)
+    players = state["table"].seats.players
+    corrected_bids = [self.__correct_bid(bid_resps[i], players, i) for i in range(len(players))]
+    auction_winner_amt = max(corrected_bids)
+    winners_pos = [i for i in range(len(players)) if corrected_bids[i] == auction_winner_amt]
+    self.__correct_auction(auction_winner_amt, winners_pos, players)
+    result_msgs = [(players[player_pos].uuid, MessageBuilder.build_auction_result_message(player_pos, winners_pos, self.river_card, state)) for player_pos in range(len(players))]
+    state["street"] += 1
+    state, street_msgs = self.__start_street(state)
+    return state, result_msgs + street_msgs
 
   @classmethod
   def apply_action(self, original_state, action, bet_amount):
@@ -40,6 +62,24 @@ class RoundManager:
       next_player = state["table"].seats.players[next_player_pos]
       ask_message = (next_player.uuid, MessageBuilder.build_ask_message(next_player_pos, state))
       return state, [update_msg, ask_message]
+
+  @classmethod
+  def __correct_bid(self, bid_amount, players, player_pos):
+    if not isinstance(bid_amount, int): return -1
+    player = players[player_pos]
+    if player.stack < bid_amount:
+        return -1
+    return bid_amount
+
+  @classmethod
+  def __correct_auction(self, winning_amount, winners_pos, players):
+    if winning_amount == 0: return
+    for winner_pos in winners_pos:
+      winner = players[winner_pos]
+      winner.collect_bet(winning_amount)
+      winner.pay_info.update_by_pay(winning_amount)
+      winner.add_action_history(Const.Action.BID, bid_amount=winning_amount)
+      winner.add_river_card(self.river_card)
 
   @classmethod
   def __correct_ante(self, ante_amount, players):
@@ -73,7 +113,9 @@ class RoundManager:
     next_player_pos = state["table"].next_ask_waiting_player_pos(state["table"].sb_pos()-1)
     state["next_player"] = next_player_pos
     street = state["street"]
-    if street == Const.Street.PREFLOP:
+    if street == Const.Street.AUCTION:
+      return self.__auction(state)
+    elif street == Const.Street.PREFLOP:
       return self.__preflop(state)
     elif street == Const.Street.FLOP:
       return self.__flop(state)
@@ -85,6 +127,11 @@ class RoundManager:
       return self.__showdown(state)
     else:
       raise ValueError("Street is already finished [street = %d]" % street)
+
+  @classmethod
+  def __auction(self, state):
+    self.river_card = state["table"].deck.draw_card()
+    return self.__forward_street(state)
 
   @classmethod
   def __preflop(self, state):
@@ -105,7 +152,7 @@ class RoundManager:
 
   @classmethod
   def __river(self, state):
-    state["table"].add_community_card(state["table"].deck.draw_card())
+    state["table"].add_community_card(self.river_card)
     return self.__forward_street(state)
 
   @classmethod
@@ -137,6 +184,8 @@ class RoundManager:
       state["street"] += 1
       state, messages = self.__start_street(state)
       return state, street_start_msg + messages
+    elif state["street"] == Const.Street.AUCTION:
+      return state, street_start_msg
     else:
       next_player_pos = state["next_player"]
       next_player = table.seats.players[next_player_pos]
@@ -214,7 +263,7 @@ class RoundManager:
     return {
         "round_count": round_count,
         "small_blind_amount": small_blind_amount,
-        "street": Const.Street.PREFLOP,
+        "street": Const.Street.AUCTION,
         "next_player": table.next_ask_waiting_player_pos(table.bb_pos()),
         "table": table
     }

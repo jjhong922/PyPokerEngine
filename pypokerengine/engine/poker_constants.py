@@ -7,8 +7,10 @@ class PokerConstants:
     SMALL_BLIND = 3
     BIG_BLIND = 4
     ANTE = 5
+    BID = 6
 
   class Street:
+    AUCTION = -1
     PREFLOP = 0
     FLOP = 1
     TURN = 2

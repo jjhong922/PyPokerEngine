@@ -35,6 +35,7 @@ class Table:
     self._community_card = []
     for player in self.seats.players:
       player.clear_holecard()
+      player.clear_river_card()
       player.clear_action_histories()
       player.clear_pay_info()
 

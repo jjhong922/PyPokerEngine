@@ -11,7 +11,7 @@ class DataEncoder:
   PAY_INFO_FOLDED_STR = "folded"
 
   @classmethod
-  def encode_player(self, player, holecard=False):
+  def encode_player(self, player, holecard=False, rivercard=False):
     hash_ = {
         "name": player.name,
         "uuid": player.uuid,
@@ -21,6 +21,9 @@ class DataEncoder:
     if holecard:
       hole_hash = {"hole_card": [str(card) for card in player.hole_card]}
       hash_.update(hole_hash)
+    if rivercard:
+      river_hash = {"river_card": player.river_card}
+      hash_.update(river_hash)
     return hash_
 
   @classmethod
@@ -121,6 +124,8 @@ class DataEncoder:
 
   @classmethod
   def __street_to_str(self, street):
+    if street == Const.Street.AUCTION:
+      return "auction"
     if street == Const.Street.PREFLOP:
       return "preflop"
     if street == Const.Street.FLOP:

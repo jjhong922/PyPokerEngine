@@ -4,6 +4,7 @@ class BasePokerPlayer(object):
   To create poker client, you need to override this class and
   implement following 7 methods.
 
+  - declare_bid
   - declare_action
   - receive_game_start_message
   - receive_round_start_message
@@ -14,6 +15,10 @@ class BasePokerPlayer(object):
 
   def __init__(self):
     pass
+
+  def declare_bid(self, hole_card, round_state):
+    err_msg = self.__build_err_msg("declare_bid")
+    raise NotImplementedError(err_msg)
 
   def declare_action(self, valid_actions, hole_card, round_state):
     err_msg = self.__build_err_msg("declare_action")
@@ -39,11 +44,22 @@ class BasePokerPlayer(object):
     err_msg = self.__build_err_msg("receive_round_result_message")
     raise NotImplementedError(err_msg)
 
+  def receive_auction_result_message(self, winners, river_card, round_state):
+    err_msg = self.__build_err_msg("receive_auction_result_message")
+    raise NotImplementedError(err_msg)
+
   def set_uuid(self, uuid):
     self.uuid = uuid
 
+  def respond_to_bid_request(self, message):
+    """Called from Dealer when bid request received from RoundManager"""
+    hole_card, round_state = self.__parse_bid_request_message(message)
+    return self.declare_bid(hole_card, round_state)
+
   def respond_to_ask(self, message):
     """Called from Dealer when ask message received from RoundManager"""
+    if message["message_type"] == "bid_request_message":
+        return self.respond_to_bid_request(message)
     valid_actions, hole_card, round_state = self.__parse_ask_message(message)
     return self.declare_action(valid_actions, hole_card, round_state)
 
@@ -71,9 +87,17 @@ class BasePokerPlayer(object):
       winners, hand_info, state = self.__parse_round_result_message(message)
       self.receive_round_result_message(winners, hand_info, state)
 
+    elif msg_type == "auction_result_message":
+      winners, river_card, round_state = self.__parse_auction_result_message(message)
+      self.receive_auction_result_message(winners, river_card, round_state)
 
   def __build_err_msg(self, msg):
     return "Your client does not implement [ {0} ] method".format(msg)
+
+  def __parse_bid_request_message(self, message):
+    hole_card = message["hole_card"]
+    round_state = message["round_state"]
+    return hole_card, round_state
 
   def __parse_ask_message(self, message):
     hole_card = message["hole_card"]
@@ -107,3 +131,8 @@ class BasePokerPlayer(object):
     round_state = message["round_state"]
     return winners, hand_info, round_state
 
+  def __parse_auction_result_message(self, message):
+    winners = message["winners"]
+    river_card = message["river_card"]
+    round_state = message["round_state"]
+    return winners, river_card, round_state

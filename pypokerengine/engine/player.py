@@ -11,11 +11,13 @@ class Player:
   ACTION_SMALL_BLIND = "SMALLBLIND"
   ACTION_BIG_BLIND = "BIGBLIND"
   ACTION_ANTE = "ANTE"
+  ACTION_BID = "BID"
 
   def __init__(self, uuid, initial_stack, name="No Name"):
     self.name = name
     self.uuid = uuid
     self.hole_card = []
+    self.river_card = None
     self.stack = initial_stack
     self.round_action_histories = self.__init_round_action_histories()
     self.action_histories = []
@@ -33,6 +35,12 @@ class Player:
   def clear_holecard(self):
     self.hole_card = []
 
+  def add_river_card(self, card):
+    self.river_card = card
+
+  def clear_river_card(self):
+    self.river_card = None
+
   def append_chip(self, amount):
     self.stack += amount
 
@@ -47,7 +55,7 @@ class Player:
   def is_waiting_ask(self):
     return self.pay_info.status == PayInfo.PAY_TILL_END
 
-  def add_action_history(self, kind, chip_amount=None, add_amount=None, sb_amount=None):
+  def add_action_history(self, kind, chip_amount=None, add_amount=None, sb_amount=None, bid_amount=None):
     history = None
     if kind == Const.Action.FOLD:
       history = self.__fold_history()
@@ -61,6 +69,8 @@ class Player:
       history = self.__blind_history(False, sb_amount)
     elif kind == Const.Action.ANTE:
       history = self.__ante_history(chip_amount)
+    elif kind == Const.Action.BID:
+      history = self.__bid_history(bid_amount)
     else:
       raise "UnKnown action history is added (kind = %s)" % kind
     history = self.__add_uuid_on_history(history)
@@ -143,6 +153,13 @@ class Player:
     return {
         "action" : self.ACTION_ANTE,
         "amount" : pay_amount
+        }
+
+  def __bid_history(self, bid_amount):
+    assert(bid_amount is not None)
+    return {
+        "action" : self.ACTION_BID,
+        "amount" : bid_amount
         }
 
   def __add_uuid_on_history(self, history):

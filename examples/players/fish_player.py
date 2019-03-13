@@ -1,6 +1,11 @@
 from pypokerengine.players import BasePokerPlayer
+import random
 
 class FishPlayer(BasePokerPlayer):  # Do not forget to make parent class as "BasePokerPlayer"
+
+    # return the number of chips you bet
+    def declare_bid(self, hole_card, round_state):
+        return random.randint(0, 100)
 
     #  we define the logic to make an action through this method. (so this method would be the core of your AI)
     def declare_action(self, valid_actions, hole_card, round_state):
@@ -24,3 +29,6 @@ class FishPlayer(BasePokerPlayer):  # Do not forget to make parent class as "Bas
     def receive_round_result_message(self, winners, hand_info, round_state):
         pass
 
+    # river card is none if you did not win
+    def receive_auction_result_message(self, winners, river_card, round_state):
+        print("{} has knowledge of river as {}".format(self, river_card))
